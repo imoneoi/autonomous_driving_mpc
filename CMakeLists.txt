@@ -53,11 +53,10 @@ find_package(Eigen3 REQUIRED)
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
+add_message_files(
+  FILES
+  car_state.msg
+)
 
 ## Generate services in the 'srv' folder
 add_service_files(
@@ -156,6 +155,7 @@ include_directories(
 # )
 
 add_compile_options(-Wall -Wextra -Wconversion -g)
+#add_compile_options(-Ofast)
 
 aux_source_directory(src/simulator simulator_SOURCE_FILES)
 add_executable(simulator ${simulator_SOURCE_FILES})
@@ -167,10 +167,21 @@ add_executable(track_publisher ${track_publisher_SOURCE_FILES})
 target_link_libraries(track_publisher ${catkin_LIBRARIES})
 add_dependencies(track_publisher ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-aux_source_directory(src/controller_pid controller_pid_SOURCE_FILES)
-add_executable(controller_pid ${controller_pid_SOURCE_FILES})
-target_link_libraries(controller_pid ${catkin_LIBRARIES})
-add_dependencies(controller_pid ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+# PID controller
+# aux_source_directory(src/controller_pid controller_pid_SOURCE_FILES)
+# add_executable(controller_pid ${controller_pid_SOURCE_FILES})
+# target_link_libraries(controller_pid ${catkin_LIBRARIES})
+# add_dependencies(controller_pid ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
+#MPC controller
+aux_source_directory(src/controller_mpc controller_mpc_SOURCE_FILES)
+add_executable(controller_mpc ${controller_mpc_SOURCE_FILES})
+target_link_libraries(controller_mpc ${catkin_LIBRARIES})
+add_dependencies(controller_mpc ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
+#OSQP for MPC controller
+target_include_directories(controller_mpc osqp/include)
+target_link_libraries(controller_mpc osqp/build/out/libosqp.a)
 
 #############
 ## Install ##

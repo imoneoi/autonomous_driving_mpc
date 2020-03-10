@@ -2,6 +2,7 @@
 #include <geometry_msgs/Twist.h>
 #include <tf/transform_broadcaster.h>
 #include <car_model/simulator_reset.h>
+#include <car_model/car_state.h>
 
 #include <mutex>
 #include <thread>
@@ -107,6 +108,7 @@ int main(int argc, char **argv) {
     ros::NodeHandle nh;
     ros::Subscriber cmd_vel_sub = nh.subscribe("cmd_vel", 10, cmdVelCallback);
     ros::ServiceServer service  = nh.advertiseService("simulator_reset", simulatorResetServiceCallback);
+    ros::Publisher state_pub    = nh.advertise<car_model::car_state>("car_state", 10);
     tf::TransformBroadcaster pos_pub_tf; 
 
     loadParameters();
@@ -128,6 +130,16 @@ int main(int argc, char **argv) {
         gSimulateMutex.unlock();
 
         //broadcast state
+        car_model::car_state state_msg;
+        state_msg.x = state.x;
+        state_msg.y = state.y;
+        state_msg.v_x = state.v_x;
+        state_msg.v_y = state.v_y;
+        state_msg.phi = state.phi;
+        state_msg.r = state.r;
+        state_pub.publish(state_msg);
+
+        //broadcast CoM tf
         ros::Time state_stamp(state.t);
 
         transform.setOrigin( tf::Vector3(state.x, state.y, 0.0) );

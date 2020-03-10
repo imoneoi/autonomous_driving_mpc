@@ -3,7 +3,7 @@
     <node name="track_publisher" pkg="car_model" type="track_publisher">
         <param name="waypoints_file" value="$(find car_model)/tracks/racetrack01.txt" />
         <param name="scale" value="0.0025" />
-        <param name="density" value="0.01" />
+        <param name="density" value="0.1" />
     </node>
 
     <!-- start simulator -->

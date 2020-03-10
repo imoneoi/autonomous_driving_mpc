@@ -1,5 +1,5 @@
-#ifndef __CAR_MODEL_CONTROLLER_PID_H__
-#define __CAR_MODEL_CONTROLLER_PID_H__
+#ifndef __CAR_MODEL_CONTROLLER_PID_PID_H__
+#define __CAR_MODEL_CONTROLLER_PID_PID_H__
 
 #include "ros/ros.h"
 
@@ -49,6 +49,10 @@ void PID::setCoefficients(double kp, double ki, double kd, double maxi, double o
 	ki_ = ki;
 	kd_ = kd;
 	maxi_ = maxi;
+
+	_error_int_ = 0;
+	last_looptime_ = ros::Time(0);
+
 	outrange_ = outrange;
 }
 

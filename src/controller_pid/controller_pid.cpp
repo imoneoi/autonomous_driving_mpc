@@ -1,7 +1,7 @@
 #include <random>
 
 #include "ros/ros.h"
-#include "controller/pid.hpp"
+#include "controller_pid/pid.hpp"
 
 #include <geometry_msgs/Twist.h>
 #include <nav_msgs/Path.h>
@@ -45,6 +45,29 @@ double gNoiseSteer = 0.0;
 
 double gSpeedSetpoint = 0.7;
 
+double quaternionToYaw(tf::Quaternion q) {
+    double angle = q.getAngle();
+    double zAxis = q.getAxis().z();
+
+    //must be quaternions around z axis
+    const double eps = 1e-5;
+    assert((std::fabs(angle) < eps) || (std::fabs(std::fabs(zAxis) - 1) < eps));
+
+    if(zAxis < 0) angle = -angle;
+    return std::fmod(angle + 2 * M_PI, 2 * M_PI);
+}
+
+double AngularMinus(double a, double b)
+{
+    a = fmod(a, 2.0 * M_PI);
+    b = fmod(b, 2.0 * M_PI);
+
+    double res1 = a - b;
+    double res2 = (a < b) ? (a + 2 * M_PI - b) : (a - 2 * M_PI - b);
+
+    return (std::abs(res1) < std::abs(res2)) ? res1 : res2;
+}
+
 double randomFloat() {
     static std::random_device rd;
     static std::mt19937 e(rd());
@@ -57,7 +80,7 @@ void pathCallback(const nav_msgs::Path::ConstPtr &path) {
     gPath = *path;
 }
 
-double findNearestWaypoint(double x, double y, geometry_msgs::Pose *pose) {
+double findNearestWaypoint(double x, double y, double yaw, geometry_msgs::Pose *pose) {
     const double inf = 1.0 / 0.0;
 
     if(gPath.poses.empty()) {
@@ -80,29 +103,6 @@ double findNearestWaypoint(double x, double y, geometry_msgs::Pose *pose) {
 
     *pose = gPath.poses[min_id].pose;
     return std::sqrt(min_dist_2);
-}
-
-double quaternionToYaw(tf::Quaternion q) {
-    double angle = q.getAngle();
-    double zAxis = q.getAxis().z();
-
-    //must be quaternions around z axis
-    const double eps = 1e-5;
-    assert((std::fabs(angle) < eps) || (std::fabs(std::fabs(zAxis) - 1) < eps));
-
-    if(zAxis < 0) angle = -angle;
-    return std::fmod(angle + 2 * M_PI, 2 * M_PI);
-}
-
-double AngularMinus(double a, double b)
-{
-    a = fmod(a, 2.0 * M_PI);
-    b = fmod(b, 2.0 * M_PI);
-
-    double res1 = a - b;
-    double res2 = (a < b) ? (a + 2 * M_PI - b) : (a - 2 * M_PI - b);
-
-    return (std::abs(res1) < std::abs(res2)) ? res1 : res2;
 }
 
 void resetSimulator() {
@@ -144,7 +144,7 @@ void parameterReconfigureCallback(car_model::PIDControllerConfig &config, uint32
     gPIDLongtitudal.setCoefficients(config.v_kp, config.v_ki, config.v_kd, config.v_maxi, gMaxAccel);
     gPIDLateral.setCoefficients(config.s_kp, config.s_ki, config.s_kd, config.s_maxi, gMaxSteer);
 
-    resetSimulator();
+    if(config.reset_simulator) resetSimulator();
 }
 
 int main(int argc, char **argv) {
@@ -203,7 +203,7 @@ int main(int argc, char **argv) {
 
         //lateral Stanley controller
         geometry_msgs::Pose waypoint;
-        double waypoint_dist = findNearestWaypoint(gState.x, gState.y, &waypoint);
+        double waypoint_dist = findNearestWaypoint(gState.x, gState.y, gState.yaw, &waypoint);
 
         tf::Quaternion q;
         tf::quaternionMsgToTF(waypoint.orientation, q);
