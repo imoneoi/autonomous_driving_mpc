@@ -17,6 +17,8 @@ namespace MPC {
         double w_position;
         double w_angle;
 
+        double w_velocity;
+
         double w_accel;
         double w_jerk;
 
@@ -52,20 +54,75 @@ namespace MPC {
         double accel;
     };
 
+    template<typename T>
+    struct SparseMatrixElement {
+        int r, c;
+        T v;
+
+        inline bool operator<(const SparseMatrixElement &rhs) {
+            return (c == rhs.c) ? (r < rhs.r) : (c < rhs.c);
+        }
+    };
+
+    template<typename T>
+    class SparseMatrix {
+    private:
+        int m_, n_;
+
+        std::vector< SparseMatrixElement<T> > elements_;
+
+        std::vector<T> osqp_csc_data_;
+        std::vector<int> osqp_csc_row_idx_;
+        std::vector<int> osqp_csc_col_start_;
+        csc *osqp_csc_instance = nullptr;
+
+        void freeOSQPCSCInstance();
+
+    public:
+        SparseMatrix();
+        ~SparseMatrix();
+
+        void initialize(int m, int n);
+        void addElement(int r, int c, T v);
+        csc *toOSQPCSC();
+    };
+
+    template<typename T>
+    class QPProblem {
+    private:
+        OSQPWorkspace *osqp_workspace_ = nullptr;
+        OSQPSettings  *osqp_settings_= nullptr;
+        OSQPData      *osqp_data_ = nullptr;
+
+    public:
+        //number of variables and constraints
+        int n_, m_;
+
+        //constraints
+        SparseMatrix<T> A_;
+        std::vector<T> l_, u_;
+
+        //cost function
+        SparseMatrix<T> P_;
+        std::vector<T> q_;
+
+        ~QPProblem();
+        void initialize(int n, int m);
+        OSQPSolution* solve(int *error_code);
+    };
+
     class Controller {
-        private:
-            OSQPWorkspace *osqp_workspace_ = nullptr;
-            OSQPSettings  *osqp_settings_= nullptr;
-            OSQPData      *osqp_data_ = nullptr;
+    private:
+        HardConstraint constraint_;
+        CostFunctionWeights weights_;
+        Parameters parameters_;
+        Model model_;
 
-            HardConstraint constraint_;
-            CostFunctionWeights weights_;
-            Parameters parameters_;
-            Model model_;
+        QPProblem<c_float> qp_;
 
-        public:
-            Controller(const Parameters &parameters, const Model &model, const HardConstraint &constraint, const CostFunctionWeights &weights);
-            void update(const State &state, const std::vector<PathPlanner::PoseStamped> &track_input, ControlOutput *out);
+    public:
+        Controller(const Parameters &parameters, const Model &model, const HardConstraint &constraint, const CostFunctionWeights &weights);
+        void update(const State &state, const std::vector<PathPlanner::PoseStamped> &track_input, ControlOutput *out);
     };
 }
 

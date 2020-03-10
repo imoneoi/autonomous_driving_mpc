@@ -15,6 +15,7 @@ using ecl::CubicSpline;
 namespace PathPlanner {
     struct PoseStamped {
         double x, y, yaw;
+        double v;
         double t;
     };
 
@@ -35,7 +36,7 @@ namespace PathPlanner {
         Planner();
 
         bool loadPath(std::string filename, double scale = 1);
-        void getPath(const PoseStamped &cur_pose, double v, double dt, int n, std::vector<PoseStamped> *path);
+        void getPath(const PoseStamped &cur_pose, double dt, int n, std::vector<PoseStamped> *path);
 
         void runTests();
     };

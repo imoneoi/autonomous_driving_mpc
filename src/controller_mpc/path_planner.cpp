@@ -1,7 +1,7 @@
 #include "controller_mpc/path_planner.h"
 #include "controller_mpc/quintic_solver.hpp"
 
-PathPlanner::Planner::PathPlanner() {
+PathPlanner::Planner::Planner() {
 
 }
 
@@ -183,18 +183,23 @@ double PathPlanner::Planner::pointWithFixedDistance(double t, double d, double e
     return (l + r) / 2;
 }
 
-void PathPlanner::Planner::getPath(const PathPlanner::PoseStamped &cur_pose, double v, double dt, int n, std::vector<PathPlanner::PoseStamped> *path) {
+void PathPlanner::Planner::getPath(const PathPlanner::PoseStamped &cur_pose, double dt, int n, std::vector<PathPlanner::PoseStamped> *path) {
+    //constant speed
+    double v = cur_pose.v;
+
+    //initial pose
     path->clear();
 
     //find nearest point on trajectory
     double t_start = nearestPointOnSpline(cur_pose.x, cur_pose.y);
-    double time    = 0;
+    double time    = dt;
 
     for(int i = 0; i < n; i++) {
-        double t = pointWithFixedDistance(t_start, v * dt * i);
+        double t = pointWithFixedDistance(t_start, v * time);
 
         path->push_back(PathPlanner::PoseStamped({
             spline_x_(t), spline_y_(t), std::atan2(spline_y_.derivative(t), spline_x_.derivative(t)),
+            v,
             time
         }));
 
