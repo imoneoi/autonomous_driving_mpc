@@ -36,7 +36,7 @@ namespace PathPlanner {
         Planner();
 
         bool loadPath(std::string filename, double scale = 1);
-        void getPath(const PoseStamped &cur_pose, double dt, int n, std::vector<PoseStamped> *path);
+        void getPath(const PoseStamped &cur_pose, double dt, double v, int n, std::vector<PoseStamped> *path);
 
         void runTests();
     };

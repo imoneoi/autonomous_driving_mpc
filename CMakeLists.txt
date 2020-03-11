@@ -180,8 +180,9 @@ target_link_libraries(controller_mpc ${catkin_LIBRARIES})
 add_dependencies(controller_mpc ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 #OSQP for MPC controller
-target_include_directories(controller_mpc osqp/include)
-target_link_libraries(controller_mpc osqp/build/out/libosqp.a)
+target_include_directories(controller_mpc PUBLIC osqp/include)
+find_library(OSQP_LIBRARY libosqp.a HINTS osqp/build/out)
+target_link_libraries(controller_mpc ${OSQP_LIBRARY} dl)
 
 #############
 ## Install ##

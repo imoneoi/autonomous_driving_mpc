@@ -183,10 +183,7 @@ double PathPlanner::Planner::pointWithFixedDistance(double t, double d, double e
     return (l + r) / 2;
 }
 
-void PathPlanner::Planner::getPath(const PathPlanner::PoseStamped &cur_pose, double dt, int n, std::vector<PathPlanner::PoseStamped> *path) {
-    //constant speed
-    double v = cur_pose.v;
-
+void PathPlanner::Planner::getPath(const PathPlanner::PoseStamped &cur_pose, double dt, double v, int n, std::vector<PathPlanner::PoseStamped> *path) {
     //initial pose
     path->clear();
 

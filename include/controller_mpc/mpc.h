@@ -72,8 +72,8 @@ namespace MPC {
         std::vector< SparseMatrixElement<T> > elements_;
 
         std::vector<T> osqp_csc_data_;
-        std::vector<int> osqp_csc_row_idx_;
-        std::vector<int> osqp_csc_col_start_;
+        std::vector<c_int> osqp_csc_row_idx_;
+        std::vector<c_int> osqp_csc_col_start_;
         csc *osqp_csc_instance = nullptr;
 
         void freeOSQPCSCInstance();
@@ -113,15 +113,18 @@ namespace MPC {
 
     class Controller {
     private:
+        QPProblem<c_float> qp_;
+
+    public:
+        /* controller parameters */
         HardConstraint constraint_;
         CostFunctionWeights weights_;
         Parameters parameters_;
         Model model_;
 
-        QPProblem<c_float> qp_;
+        Controller();
 
-    public:
-        Controller(const Parameters &parameters, const Model &model, const HardConstraint &constraint, const CostFunctionWeights &weights);
+        void initialize(const Parameters &parameters, const Model &model, const HardConstraint &constraint, const CostFunctionWeights &weights);
         void update(const State &state, const std::vector<PathPlanner::PoseStamped> &track_input, ControlOutput *out);
     };
 }

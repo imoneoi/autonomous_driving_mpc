@@ -1,5 +1,11 @@
 #include "controller_mpc/mpc.h"
 
+template
+class MPC::SparseMatrix<c_float>;
+
+template
+class MPC::QPProblem<c_float>;
+
 template<typename T>
 MPC::SparseMatrix<T>::SparseMatrix() {
     m_ = n_ = 0;
@@ -80,7 +86,7 @@ void MPC::QPProblem<T>::initialize(int n, int m) {
     n_ = n;
     m_ = m;
 
-    A.initialize(m_, n_);
+    A_.initialize(m_, n_);
     l_.resize(m_);
     u_.resize(m_);
 
@@ -124,21 +130,21 @@ OSQPSolution* MPC::QPProblem<T>::solve(int *error_code) {
         osqp_update_lin_cost(osqp_workspace_, q_.data());
     }
 
-    error_code = osqp_solve(osqp_workspace_);
+    *error_code = osqp_solve(osqp_workspace_);
 
     return osqp_workspace_->solution;
 }
 
-MPC::Controller::Controller(const Parameters &parameters, const Model &model, const HardConstraint &constraint, const CostFunctionWeights &weights) {
+MPC::Controller::Controller() {
+
+}
+
+void MPC::Controller::initialize(const Parameters &parameters, const Model &model, const HardConstraint &constraint, const CostFunctionWeights &weights) {
     parameters_ = parameters;
     model_ = model;
 
     constraint_ = constraint;
     weights_    = weights;
-}
-
-MPC::Controller::~Controller() {
-    
 }
 
 void MPC::Controller::update(const State &state, const std::vector<PathPlanner::PoseStamped> &track_input, ControlOutput *out) {
