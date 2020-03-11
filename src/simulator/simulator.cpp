@@ -46,14 +46,37 @@ template<typename T>
 void Simulator<T>::step(SimulatorState<T> *state, const SimulatorInput<T> &input, const SimulatorParameters<T> &param, int num_steps) {
     T dt = param.dt_;
 
+    //Naive model
+    T max_delta = param.vehicle_parameters.max_steer;
+    T delta = std::min(max_delta, std::max(-max_delta, input.steer_));
+    T a = std::min(std::max(-param.vehicle_parameters.max_accel, input.force_), param.vehicle_parameters.max_accel);
+
+    for (int step = 0; step < num_steps; step++) {
+        T beta = std::atan(param.vehicle_parameters.b / (param.vehicle_parameters.a + param.vehicle_parameters.b) * std::tan(delta));
+    
+        T x_next      = state->x   + dt * state->v_x * std::cos(state->phi + beta);
+        T y_next      = state->y   + dt * state->v_x * std::sin(state->phi + beta);
+        T phi_next    = state->phi + dt * state->v_x / param.vehicle_parameters.b * sin(beta);
+        T v_next      = state->v_x + a * dt;
+
+        state->x = x_next;
+        state->y = y_next;
+        state->phi = phi_next;
+        state->v_x = v_next;
+        state->v_y = 0;
+        state->r = 0;
+
+        state->t += dt;
+    }
+
     //Reference: https://github.com/MPC-Berkeley/barc/blob/master/workspace/src/barc/src/estimation/system_models.py
 
     //T eps = 1e-8;
 
     //extract parameters
-    T max_d_f = param.vehicle_parameters.max_steer;
+    /*T max_d_f = param.vehicle_parameters.max_steer;
     T d_f = std::min(max_d_f, std::max(-max_d_f, input.steer_));
-    T FxR = std::min(std::max(T(0), input.force_), param.vehicle_parameters.max_accel);
+    T FxR = std::min(std::max(-param.vehicle_parameters.max_accel, input.force_), param.vehicle_parameters.max_accel);
 
     //T d_f = input.steer_;
     //T FxR = input.force_;
@@ -117,5 +140,5 @@ void Simulator<T>::step(SimulatorState<T> *state, const SimulatorInput<T> &input
         state->r = r_next;
 
         state->t += dt;
-    }
+    }*/
 }
