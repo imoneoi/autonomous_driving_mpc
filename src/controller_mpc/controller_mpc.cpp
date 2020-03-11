@@ -19,9 +19,9 @@ MPC::IterativeController gController;
 
 void initializeMPC() {
     MPC::Parameters parameters;
-    parameters.dt = 0.1;
-    parameters.pred_horizon = 20;
-    parameters.control_horizon = 10;
+    parameters.dt = 0.025;
+    parameters.pred_horizon = 40;
+    parameters.control_horizon = 20;
 
     MPC::Model model;
     model.l_f = 0.125;
@@ -33,7 +33,8 @@ void initializeMPC() {
     constraint.min_accel = -2.0;
     constraint.max_steer = 30.0 / 180.0 * M_PI;
 
-    //constraint.max_dsteer = constraint.max_steer * parameters.dt;
+    constraint.max_steer_rate = constraint.max_steer / 1.0;
+    constraint.max_jerk   = constraint.max_accel / 0.1;
 
     MPC::CostFunctionWeights weights;
     weights.w_position = 1.0;
@@ -82,6 +83,10 @@ void resetSimulator() {
     ros::Duration(0.1).sleep();
 }
 
+double normalizeAngle(double a) {
+    return fmod(fmod(a + M_PI, 2 * M_PI) + 2 * M_PI, 2 * M_PI) - M_PI;
+}
+
 int main(int argc, char **argv) {
     ros::init(argc, argv, "controller_mpc");
 
@@ -115,9 +120,10 @@ int main(int argc, char **argv) {
         MPC::State state;
         state.x = gState.x;
         state.y = gState.y;
-        state.yaw = gState.phi;
+        state.yaw = normalizeAngle(gState.phi);
         state.v = sqrt(gState.v_x * gState.v_x + gState.v_y * gState.v_y);
         state.steer_angle = last_steer_angle;
+        state.accel = last_accel;
 
         //plan track
         PathPlanner::PoseStamped start_pose;
@@ -145,6 +151,7 @@ int main(int argc, char **argv) {
         cmd_vel_pub.publish(cmd_vel);
 
         last_steer_angle = control_output.steer;
+        last_accel       = control_output.accel;
 
         //visualize track
         geometry_msgs::PoseArray planned_trajectory;

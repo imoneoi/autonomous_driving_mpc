@@ -11,6 +11,9 @@ namespace MPC {
 
         double max_accel;
         double min_accel;
+
+        double max_steer_rate;
+        double max_jerk;
     };
 
     struct CostFunctionWeights {

@@ -156,6 +156,9 @@ void MPC::Controller::update(const State &state, const State &linearize_point, c
     auto control_var_idx = [&] (int t, int id) {
         return parameters_.pred_horizon * dim_state + std::min(t, parameters_.control_horizon - 1) * dim_control + id;
     };
+    auto control_derivative_row_idx = [&] (int t, int id) {
+        return dim_state * parameters_.pred_horizon + dim_control * parameters_.control_horizon + std::min(t, parameters_.control_horizon - 1) * dim_control + id;
+    };
     /*auto normalize_angle = [&] (double a) {
         return fmod(fmod(a + M_PI, 2 * M_PI) + 2 * M_PI, 2 * M_PI) - M_PI;
     };*/
@@ -171,7 +174,7 @@ void MPC::Controller::update(const State &state, const State &linearize_point, c
     */
 
     int n = dim_state * parameters_.pred_horizon + dim_control * parameters_.control_horizon; //number of variables
-    int m = n; //number of constraints
+    int m = n + dim_control * parameters_.control_horizon; //number of constraints
 
     c_float dt = parameters_.dt;
 
@@ -233,6 +236,35 @@ void MPC::Controller::update(const State &state, const State &linearize_point, c
 
         qp_.l_[control_var_idx(t, 1)] = constraint_.min_accel;
         qp_.u_[control_var_idx(t, 1)] = constraint_.max_accel;
+    }
+
+    //create control derivative constraints
+    //integral average approximation
+    double max_delta_beta  = dt * constraint_.max_steer_rate * ((get_beta_from_steer(constraint_.max_steer) - get_beta_from_steer(0)) / (constraint_.max_steer - 0));
+    double max_delta_accel = dt * constraint_.max_jerk;
+
+    for(int i = 0; i < dim_control; i++) {
+        qp_.A_.addElement(control_derivative_row_idx(0, i), control_var_idx(0, i), 1);
+    }
+
+    c_float state_beta = get_beta_from_steer(state.steer_angle);
+    qp_.l_[control_derivative_row_idx(0, 0)] = state_beta - max_delta_beta;
+    qp_.u_[control_derivative_row_idx(0, 0)] = state_beta + max_delta_beta;
+
+    qp_.l_[control_derivative_row_idx(0, 1)] = state.accel - max_delta_accel;
+    qp_.u_[control_derivative_row_idx(0, 1)] = state.accel + max_delta_accel;
+
+    for(int t = 1; t < parameters_.control_horizon; t++) {
+        for(int i = 0; i < dim_control; i++) {
+            qp_.A_.addElement(control_derivative_row_idx(t, i), control_var_idx(t, i),      1);
+            qp_.A_.addElement(control_derivative_row_idx(t, i), control_var_idx(t - 1, i), -1);
+        }
+
+        qp_.l_[control_derivative_row_idx(t, 0)] = -max_delta_beta;
+        qp_.u_[control_derivative_row_idx(t, 0)] =  max_delta_beta;
+
+        qp_.l_[control_derivative_row_idx(t, 1)] = -max_delta_accel;
+        qp_.u_[control_derivative_row_idx(t, 1)] =  max_delta_accel;
     }
 
     //create cost function
