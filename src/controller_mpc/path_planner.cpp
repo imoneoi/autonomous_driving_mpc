@@ -183,12 +183,60 @@ double PathPlanner::Planner::pointWithFixedDistance(double t, double d, double e
     return (l + r) / 2;
 }
 
-void PathPlanner::Planner::getPath(const PathPlanner::PoseStamped &cur_pose, double dt, double v, int n, std::vector<PathPlanner::PoseStamped> *path) {
+double PathPlanner::Planner::maxCurvature(double l, double r, double numerical_eps) {
+    double max_curvature = 0;
+
+    int max_segments = int(spline_x_.polynomials().size()) - 1;
+    for(int segment = int(l); segment <= std::min(int(r), max_segments); segment++) {
+        double start = std::max(l, double(segment));
+        double end   = std::min(r, double(segment + 1));
+
+        const ecl::CubicPolynomial::Coefficients& coeff_x = spline_x_.polynomials()[segment].coefficients();
+        const ecl::CubicPolynomial::Coefficients& coeff_y = spline_y_.polynomials()[segment].coefficients();
+
+        //quadratic equation of curvature = a * x^2 + b * x + c
+        double a = 36 * (coeff_x[3] * coeff_x[3] + coeff_y[3] * coeff_y[3]);
+        double b = 24 * (coeff_x[2] * coeff_x[3] + coeff_y[2] * coeff_y[3]);
+        double c = 4  * (coeff_x[2] * coeff_x[2] + coeff_y[2] * coeff_y[2]);
+
+        if(std::fabs(b) > numerical_eps) {
+            double x = -a / b;
+            if((x >= start) && (x <= end)) max_curvature = std::max(max_curvature, c + x * (b + x * a));
+        }
+
+        max_curvature = std::max(max_curvature, c + start * (b + start * a));
+        max_curvature = std::max(max_curvature, c +   end * (b + end   * a));
+    }
+
+    return max_curvature;
+}
+
+void PathPlanner::Planner::getPath(const PathPlanner::PoseStamped &cur_pose, double dt, double v_ref, double v_min, double k, double max_brake_accel, int n, std::vector<PathPlanner::PoseStamped> *path) {
     //initial pose
     path->clear();
 
     //find nearest point on trajectory
     double t_start = nearestPointOnSpline(cur_pose.x, cur_pose.y);
+
+    //calculate max curvature radius
+    /*double brake_time = std::max(v_min, cur_pose.v) / max_brake_accel;
+    double horizon_length = cur_pose.v * brake_time - 0.5 * max_brake_accel * brake_time * brake_time;
+    double max_curvature = maxCurvature(t_start, pointWithFixedDistance(t_start, horizon_length));
+
+    //calculate speed
+    double eps = 1e-8;
+    double v   = v_ref;
+    if(max_curvature > eps) {
+        //max velocity at certain radius
+        double max_v = k * (1 / max_curvature);
+
+        v = std::min(v, std::max(v_min, max_v));
+    }
+
+    printf("h: %lf, v: %lf\n", horizon_length, v);*/
+
+    double v   = v_ref;
+
     double time    = dt;
 
     for(int i = 0; i < n; i++) {

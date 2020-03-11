@@ -24,7 +24,7 @@ void MPC::SparseMatrix<T>::freeOSQPCSCInstance() {
     osqp_csc_col_start_.clear();
 
     if(osqp_csc_instance != nullptr) {
-        csc_spfree(osqp_csc_instance);
+        c_free(osqp_csc_instance);
         osqp_csc_instance = nullptr;
     }
 }
@@ -52,9 +52,9 @@ csc* MPC::SparseMatrix<T>::toOSQPCSC() {
 
     osqp_csc_col_start_.push_back(0);
     for(int c = 0; c < n_; c++) {
-        if((idx < n_elem) && elements_[idx].c == c) {
+        while((idx < n_elem) && elements_[idx].c == c) {
             osqp_csc_data_.push_back(elements_[idx].v);
-            osqp_csc_row_idx_.push_back(elements_[idx].c);
+            osqp_csc_row_idx_.push_back(elements_[idx].r);
             idx++;
         }
 
@@ -68,14 +68,6 @@ csc* MPC::SparseMatrix<T>::toOSQPCSC() {
 template<typename T>
 MPC::QPProblem<T>::~QPProblem() {
     if(osqp_workspace_ != nullptr) {
-        //clear data
-        osqp_data_->A = nullptr;
-        osqp_data_->l = nullptr;
-        osqp_data_->u = nullptr;
-
-        osqp_data_->P = nullptr;
-        osqp_data_->q = nullptr;
-
         //cleanup workspace
         osqp_cleanup(osqp_workspace_);
     }
@@ -147,7 +139,7 @@ void MPC::Controller::initialize(const Parameters &parameters, const Model &mode
     weights_    = weights;
 }
 
-void MPC::Controller::update(const State &state, const std::vector<PathPlanner::PoseStamped> &track_input, ControlOutput *out) {
+void MPC::Controller::update(const State &state, const State &linearize_point, const std::vector<PathPlanner::PoseStamped> &track_input, ControlOutput *out, std::vector<State> *pred_out) {
     /*
         Variable:
             [s0 s1 s2 s3 ...](t=0) [s0 s1 s2 s3 ...](t=1) ... [c0 c1 ...](t=0)
@@ -196,7 +188,7 @@ void MPC::Controller::update(const State &state, const std::vector<PathPlanner::
     qp_.l_[2] = qp_.u_[2] = state.v;
     qp_.l_[3] = qp_.u_[3] = state.yaw;
 
-    c_float state_beta = get_beta_from_steer(state.steer_angle);
+    c_float linearize_beta = get_beta_from_steer(linearize_point.steer_angle);
 
     //create state model constraints
     for(int t = 1; t < parameters_.pred_horizon; t++) {
@@ -206,33 +198,30 @@ void MPC::Controller::update(const State &state, const std::vector<PathPlanner::
         qp_.A_.addElement(state_var_idx(t, 0), state_var_idx(t, 0), -1);
         qp_.A_.addElement(state_var_idx(t, 0), state_var_idx(t - 1, 0), 1);
 
-        qp_.A_.addElement(state_var_idx(t, 0), state_var_idx(t - 1, 3),   dt * state.v * -std::sin(state.yaw + state_beta));
-        qp_.A_.addElement(state_var_idx(t, 0), control_var_idx(t - 1, 0), dt * state.v * -std::sin(state.yaw + state_beta));
+        qp_.A_.addElement(state_var_idx(t, 0), state_var_idx(t - 1, 2), dt * std::cos(linearize_point.yaw + linearize_beta));
+        qp_.A_.addElement(state_var_idx(t, 0), state_var_idx(t - 1, 3), dt * -linearize_point.v * std::sin(linearize_point.yaw + linearize_beta));
+        qp_.l_[state_var_idx(t, 0)] = qp_.u_[state_var_idx(t, 0)] =   -(dt *  linearize_point.v * std::sin(linearize_point.yaw + linearize_beta) * (linearize_point.yaw + linearize_beta));
 
         //y
         qp_.A_.addElement(state_var_idx(t, 1), state_var_idx(t, 1), -1);
         qp_.A_.addElement(state_var_idx(t, 1), state_var_idx(t - 1, 1), 1);
 
-        qp_.A_.addElement(state_var_idx(t, 1), state_var_idx(t - 1, 3),   dt * state.v * std::cos(state.yaw + state_beta));
-        qp_.A_.addElement(state_var_idx(t, 1), control_var_idx(t - 1, 0), dt * state.v * std::cos(state.yaw + state_beta));
+        qp_.A_.addElement(state_var_idx(t, 1), state_var_idx(t - 1, 2), dt * std::sin(linearize_point.yaw + linearize_beta));
+        qp_.A_.addElement(state_var_idx(t, 1), state_var_idx(t - 1, 3), dt * linearize_point.v * std::cos(linearize_point.yaw + linearize_beta));
+        qp_.l_[state_var_idx(t, 1)] = qp_.u_[state_var_idx(t, 1)] =  -(-dt * linearize_point.v * std::cos(linearize_point.yaw + linearize_beta) * (linearize_point.yaw + linearize_beta));
 
         //v
         qp_.A_.addElement(state_var_idx(t, 2), state_var_idx(t, 2), -1);
         qp_.A_.addElement(state_var_idx(t, 2), state_var_idx(t - 1, 2), 1);
-
         qp_.A_.addElement(state_var_idx(t, 2), control_var_idx(t - 1, 1), dt);
+        qp_.l_[state_var_idx(t, 2)] = qp_.u_[state_var_idx(t, 2)] = 0;
 
         //yaw
         qp_.A_.addElement(state_var_idx(t, 3), state_var_idx(t, 3), -1);
         qp_.A_.addElement(state_var_idx(t, 3), state_var_idx(t - 1, 3), 1);
-
-        qp_.A_.addElement(state_var_idx(t, 3), control_var_idx(t - 1, 0), dt * state.v / model_.l_r * std::cos(state_beta));
-
-        //l, u set to zero
-        for(int i = 0; i < dim_state; i++) {
-            int row = state_var_idx(t, i);
-            qp_.l_[row] = qp_.u_[row] = 0;
-        }
+        qp_.A_.addElement(state_var_idx(t, 3), state_var_idx(t - 1, 2), dt * std::sin(linearize_beta) / model_.l_r);
+        qp_.A_.addElement(state_var_idx(t, 3), control_var_idx(t - 1, 0), dt * linearize_point.v / model_.l_r * std::cos(linearize_beta));
+        qp_.l_[state_var_idx(t, 3)] = qp_.u_[state_var_idx(t, 3)] =    -(-dt * linearize_point.v / model_.l_r * std::cos(linearize_beta) * linearize_beta);
     }
 
     //create control output constraints
@@ -247,6 +236,7 @@ void MPC::Controller::update(const State &state, const std::vector<PathPlanner::
     }
 
     //create cost function
+    //pred horizon
     for(int t = 1; t < parameters_.pred_horizon; t++) {
         PathPlanner::PoseStamped pose = track_input[t - 1];
 
@@ -273,7 +263,10 @@ void MPC::Controller::update(const State &state, const std::vector<PathPlanner::
         //velocity
         qp_.P_.addElement(state_var_idx(t, 2), state_var_idx(t, 2), weights_.w_velocity);
         qp_.q_[state_var_idx(t, 2)] = -weights_.w_velocity * pose.v;
+    }
 
+    //control horizon
+    for(int t = 0; t < parameters_.control_horizon; t++) {
         //accel
         qp_.P_.addElement(control_var_idx(t, 0), control_var_idx(t, 0), weights_.w_accel);
 
@@ -286,4 +279,57 @@ void MPC::Controller::update(const State &state, const std::vector<PathPlanner::
 
     out->steer = get_steer_from_beta(solution->x[control_var_idx(0, 0)]);
     out->accel = solution->x[control_var_idx(0, 1)];
+
+    //output predictive result
+    if(pred_out != nullptr) {
+        pred_out->clear();
+
+        for(int t = 0; t < parameters_.pred_horizon; t++) {
+            State pred_state;
+            pred_state.x = solution->x[state_var_idx(t, 0)];
+            pred_state.y = solution->x[state_var_idx(t, 1)];
+            pred_state.v = solution->x[state_var_idx(t, 2)];
+            pred_state.yaw = solution->x[state_var_idx(t, 3)];
+
+            pred_out->push_back(pred_state);
+        }
+    }
+}
+
+void MPC::IterativeController::simulate(const State &state, State *next) {
+    double dt = parameters_.dt;
+    double beta = std::atan(model_.l_r / (model_.l_f + model_.l_r) * std::tan(state.steer_angle));
+
+    next->x   = state.x + dt * state.v * std::cos(state.yaw + beta);
+    next->y   = state.y + dt * state.v * std::sin(state.yaw + beta);
+    next->yaw = state.yaw + dt * state.v / model_.l_r * std::sin(beta);
+    next->v   = state.v + dt * state.accel;
+
+    next->accel = state.accel;
+    next->steer_angle = state.steer_angle;
+}
+
+void MPC::IterativeController::update(const State &state, const std::vector<PathPlanner::PoseStamped> &track_input, int iterations, double threshold, ControlOutput *out, std::vector<State> *pred_out) {
+    State state_with_new_control_input = state;
+
+    int num_iterations = 0;
+    for(int i = 0; i < iterations; i++) {
+        num_iterations++;
+
+        State linearize_point;
+        simulate(state_with_new_control_input, &linearize_point);
+
+        Controller::update(state, linearize_point, track_input, out, pred_out);
+
+        double delta_output = 
+            std::fabs(state_with_new_control_input.accel - out->accel) + 
+            std::fabs(state_with_new_control_input.steer_angle - out->steer);
+
+        if(delta_output < threshold) break;
+
+        state_with_new_control_input.accel       = out->accel;
+        state_with_new_control_input.steer_angle = out->steer;
+    }
+
+    printf("%d iterations\n", num_iterations);
 }

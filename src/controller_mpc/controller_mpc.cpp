@@ -5,14 +5,17 @@
 #include <tf/tf.h>
 
 #include <geometry_msgs/Twist.h>
+#include <geometry_msgs/PoseArray.h>
 #include <car_model/simulator_reset.h>
 #include <car_model/car_state.h>
 
-double gVelocity = 1.0;
+double gVelocity = 5.0;
+double gMinVelocity = 0.5;
+double gCurvatureK = 150.0;
 
 car_model::car_state gState;
 PathPlanner::Planner gPlanner;
-MPC::Controller gController;
+MPC::IterativeController gController;
 
 void initializeMPC() {
     MPC::Parameters parameters;
@@ -26,18 +29,20 @@ void initializeMPC() {
     model.m   = 1.98;
 
     MPC::HardConstraint constraint;
-    constraint.max_accel = 2;
-    constraint.min_accel = 0;
+    constraint.max_accel = 2.0;
+    constraint.min_accel = -2.0;
     constraint.max_steer = 30.0 / 180.0 * M_PI;
+
+    //constraint.max_dsteer = constraint.max_steer * parameters.dt;
 
     MPC::CostFunctionWeights weights;
     weights.w_position = 1.0;
-    weights.w_angle    = 1.0;
+    weights.w_angle    = 0.1;
 
-    weights.w_velocity = 1.0;
+    weights.w_velocity = 0.025;
 
-    weights.w_steer = 0;
-    weights.w_accel = 0;
+    weights.w_steer = 0.01;
+    weights.w_accel = 0.01;
 
     weights.w_dsteer = 0;
     weights.w_jerk   = 0;
@@ -60,7 +65,7 @@ void resetSimulator() {
         initial_state.yaw = 0;
         initial_state.v = 0;
         initial_state.t = 0;
-        gPlanner.getPath(initial_state, 0, 0, 1, &poses);
+        gPlanner.getPath(initial_state, 0, 0, 0, 0, 1, 1, &poses);
 
         simulator_reset_srv.request.x = poses[0].x;
         simulator_reset_srv.request.y = poses[0].y;
@@ -82,8 +87,10 @@ int main(int argc, char **argv) {
 
     //setup communication
     ros::NodeHandle nh;
-    ros::Publisher  cmd_vel_pub  = nh.advertise<geometry_msgs::Twist>("cmd_vel", 5);
-    ros::Subscriber state_sub    = nh.subscribe<car_model::car_state>("car_state", 1, stateCallback);
+    ros::Publisher  cmd_vel_pub     = nh.advertise<geometry_msgs::Twist>("cmd_vel", 10);
+    ros::Publisher  trajectory_pub  = nh.advertise<geometry_msgs::PoseArray>("planned_trajectory", 1);
+    ros::Publisher  prediction_pub  = nh.advertise<geometry_msgs::PoseArray>("predicted_trajectory", 1);
+    ros::Subscriber state_sub       = nh.subscribe<car_model::car_state>("car_state", 1, stateCallback);
 
     //load tracks
     ros::NodeHandle nh_priv("~");
@@ -100,6 +107,7 @@ int main(int argc, char **argv) {
     ROS_INFO("MPC controller online.");
 
     double last_steer_angle = 0.0;
+    double last_accel = 0;
 
     ros::Rate rate(50);
     while (ros::ok()) {
@@ -108,7 +116,7 @@ int main(int argc, char **argv) {
         state.x = gState.x;
         state.y = gState.y;
         state.yaw = gState.phi;
-        state.v = gState.v_x;
+        state.v = sqrt(gState.v_x * gState.v_x + gState.v_y * gState.v_y);
         state.steer_angle = last_steer_angle;
 
         //plan track
@@ -121,11 +129,12 @@ int main(int argc, char **argv) {
         start_pose.v = gState.v_x;
         start_pose.t = 0;
 
-        gPlanner.getPath(start_pose, gController.parameters_.dt, gVelocity, gController.parameters_.pred_horizon - 1, &track);
+        gPlanner.getPath(start_pose, gController.parameters_.dt, gVelocity, gMinVelocity, gCurvatureK, 0.25, gController.parameters_.pred_horizon - 1, &track);
 
         //calculate mpc
         MPC::ControlOutput control_output;
-        gController.update(state, track, &control_output);
+        std::vector<MPC::State> prediction_output;
+        gController.update(state, track, 10, 0.01, &control_output, &prediction_output);
 
         //send control commands
         geometry_msgs::Twist cmd_vel;
@@ -136,6 +145,36 @@ int main(int argc, char **argv) {
         cmd_vel_pub.publish(cmd_vel);
 
         last_steer_angle = control_output.steer;
+
+        //visualize track
+        geometry_msgs::PoseArray planned_trajectory;
+        planned_trajectory.header.frame_id = "map";
+
+        for(int i = 0; i < track.size(); i++) {
+            geometry_msgs::Pose pose;
+            pose.position.x = track[i].x;
+            pose.position.y = track[i].y;
+            pose.position.z = 0;
+            pose.orientation = tf::createQuaternionMsgFromYaw(track[i].yaw);
+
+            planned_trajectory.poses.push_back(pose);
+        }
+        trajectory_pub.publish(planned_trajectory);
+
+        //visualize predicted track
+        geometry_msgs::PoseArray predicted_trajectory;
+        predicted_trajectory.header.frame_id = "map";
+
+        for(int i = 0; i < prediction_output.size(); i++) {
+            geometry_msgs::Pose pose;
+            pose.position.x = prediction_output[i].x;
+            pose.position.y = prediction_output[i].y;
+            pose.position.z = 0;
+            pose.orientation = tf::createQuaternionMsgFromYaw(prediction_output[i].yaw);
+
+            predicted_trajectory.poses.push_back(pose);
+        }
+        prediction_pub.publish(predicted_trajectory);
 
         //sleep and spin
         rate.sleep();

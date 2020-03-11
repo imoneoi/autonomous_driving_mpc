@@ -33,6 +33,7 @@ namespace MPC {
         double v;
 
         double steer_angle;
+        double accel;
     };
 
     struct Parameters {
@@ -125,7 +126,13 @@ namespace MPC {
         Controller();
 
         void initialize(const Parameters &parameters, const Model &model, const HardConstraint &constraint, const CostFunctionWeights &weights);
-        void update(const State &state, const std::vector<PathPlanner::PoseStamped> &track_input, ControlOutput *out);
+        void update(const State &state, const State &linearize_point, const std::vector<PathPlanner::PoseStamped> &track_input, ControlOutput *out, std::vector<State> *pred_out);
+    };
+
+    class IterativeController : public Controller {
+    public:
+        void simulate(const State &state, State *next);
+        void update(const State &state, const std::vector<PathPlanner::PoseStamped> &track_input, int iterations, double threshold, ControlOutput *out, std::vector<State> *pred_out);
     };
 }
 

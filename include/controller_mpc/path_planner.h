@@ -30,13 +30,14 @@ namespace PathPlanner {
         double nearestPointOnSpline(double x, double y, double eps = 1e-8);
         double lengthOfSpline(double a, double b);
         double pointWithFixedDistance(double t, double d, double eps = 1e-8);
+        double maxCurvature(double l, double r, double numerical_eps = 1e-8);
 
         double randomFloat();
     public:
         Planner();
 
         bool loadPath(std::string filename, double scale = 1);
-        void getPath(const PoseStamped &cur_pose, double dt, double v, int n, std::vector<PoseStamped> *path);
+        void getPath(const PathPlanner::PoseStamped &cur_pose, double dt, double v_ref, double v_min, double k, double max_brake_accel, int n, std::vector<PathPlanner::PoseStamped> *path);
 
         void runTests();
     };
