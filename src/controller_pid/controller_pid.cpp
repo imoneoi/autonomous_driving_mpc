@@ -13,6 +13,34 @@
 #include <car_model/simulator_reset.h>
 #include <car_model/PIDControllerConfig.h>
 
+struct RampFilter
+{
+    ros::Time last_time = ros::Time(0);
+    double last_value = 0;
+
+    double limit_abs(double x, double max_abs)
+    {
+        double sign = (x < 0) ? -1 : 1;
+        return sign * std::min(std::abs(x), std::abs(max_abs));
+    }
+    double filter(double set_value, double max_value, double accel)
+    {
+        double dt = (ros::Time::now() - last_time).toSec();
+        if (!dt)
+        {
+            return set_value;
+        }
+
+        //limit input
+        set_value = limit_abs(set_value, max_value);
+
+        //ramp filter
+        last_time = ros::Time::now();
+        last_value += limit_abs(set_value - last_value, accel * dt);
+        return last_value;
+    }
+};
+
 struct State {
     double x, y, yaw;
 
@@ -36,14 +64,19 @@ State gState, gLastState;
 PID gPIDLongtitudal;
 PID gPIDLateral;
 nav_msgs::Path gPath;
+RampFilter gSteerFilter;
+RampFilter gAccelFilter;
 
-double gMaxAccel = 3.0;
-double gMaxSteer = 45.0 / 180.0 * M_PI;
+double gMaxAccel = 0.0;
+double gMaxSteer = 0.0;
+
+double gMaxJerk = 0.0;
+double gMaxSteerRate = 0.0;
 
 double gNoiseAccel = 0.0;
 double gNoiseSteer = 0.0;
 
-double gSpeedSetpoint = 0.7;
+double gSpeedSetpoint = 0.0;
 
 double quaternionToYaw(tf::Quaternion q) {
     double angle = q.getAngle();
@@ -135,6 +168,9 @@ void resetSimulator() {
 void parameterReconfigureCallback(car_model::PIDControllerConfig &config, uint32_t level) {
     gMaxAccel = config.max_accel;
     gMaxSteer = config.max_steer * M_PI / 180.0;
+
+    gMaxJerk = config.max_jerk;
+    gMaxSteerRate = config.max_dsteer;
 
     gNoiseAccel = config.noise_accel;
     gNoiseSteer = config.noise_steer;
@@ -233,6 +269,9 @@ int main(int argc, char **argv) {
         //clamp control commands
         twist.linear.x  = std::min(gMaxAccel, std::max(0.0, twist.linear.x));
         twist.angular.z = std::min(gMaxSteer, std::max(-gMaxSteer, twist.angular.z));
+
+        twist.linear.x   = gAccelFilter.filter(twist.linear.x, gMaxAccel, gMaxJerk);
+        twist.angular.z  = gSteerFilter.filter(twist.angular.z, gMaxSteer, gMaxSteerRate);
 
         //send control command
         cmd_vel_pub.publish(twist);

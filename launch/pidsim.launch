@@ -1,0 +1,17 @@
+<launch>
+    <!-- load waypoints -->
+    <node name="track_publisher" pkg="car_model" type="track_publisher">
+        <param name="waypoints_file" value="$(find car_model)/tracks/racetrack01.txt" />
+        <param name="scale" value="0.0025" />
+        <param name="density" value="0.005" />
+    </node>
+
+    <!-- start simulator -->
+    <node name="simulator" pkg="car_model" type="simulator">
+        <rosparam command="load" file="$(find car_model)/param/simulator_racetrack01.yaml" />
+    </node>
+
+    <!-- start Rviz -->
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find car_model)/rviz/sim.rviz">
+    </node>
+</launch>
