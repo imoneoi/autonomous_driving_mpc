@@ -140,7 +140,7 @@ int main(int argc, char **argv) {
         //calculate mpc
         MPC::ControlOutput control_output;
         std::vector<MPC::State> prediction_output;
-        gController.update(state, track, 10, 0.01, &control_output, &prediction_output);
+        gController.update(state, track, 3, 0.01, &control_output, &prediction_output);
 
         //send control commands
         geometry_msgs::Twist cmd_vel;

@@ -7,7 +7,6 @@ Panels:
         - /Grid1
         - /TF1
         - /TF1/Frames1
-        - /TF1/Frames1/base_link1
         - /PoseArray1
         - /PoseArray2
       Splitter Ratio: 0.5
@@ -173,7 +172,7 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Angle: 0.49499985575675964
+      Angle: 0
       Class: rviz/TopDownOrtho
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
@@ -183,11 +182,11 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 58.92974090576172
+      Scale: 76.76531982421875
       Target Frame: base_link
       Value: TopDownOrtho (rviz)
-      X: -8.026344299316406
-      Y: -6.539271831512451
+      X: 0
+      Y: 0
     Saved: ~
 Window Geometry:
   Displays:
