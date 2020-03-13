@@ -9,7 +9,7 @@
 #include <car_model/simulator_reset.h>
 #include <car_model/car_state.h>
 
-double gVelocity = 5.0;
+double gVelocity = 10.0;
 double gMinVelocity = 0.5;
 double gCurvatureK = 150.0;
 
@@ -19,7 +19,7 @@ MPC::IterativeController gController;
 
 void initializeMPC() {
     MPC::Parameters parameters;
-    parameters.dt = 0.025;
+    parameters.dt = 0.01;
     parameters.pred_horizon = 40;
     parameters.control_horizon = 20;
 
@@ -33,8 +33,8 @@ void initializeMPC() {
     constraint.min_accel = -2.0;
     constraint.max_steer = 30.0 / 180.0 * M_PI;
 
-    constraint.max_steer_rate = constraint.max_steer / 1.0;
-    constraint.max_jerk   = constraint.max_accel / 0.1;
+    constraint.max_steer_rate = 60.0 / 180.0 * M_PI;
+    constraint.max_jerk       = 10.0;
 
     MPC::CostFunctionWeights weights;
     weights.w_position = 1.0;

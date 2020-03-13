@@ -68,6 +68,13 @@ csc* MPC::SparseMatrix<T>::toOSQPCSC() {
 template<typename T>
 MPC::QPProblem<T>::~QPProblem() {
     if(osqp_workspace_ != nullptr) {
+        osqp_workspace_->data->P = nullptr;
+        osqp_workspace_->data->q = nullptr;
+
+        osqp_workspace_->data->A = nullptr;
+        osqp_workspace_->data->l = nullptr;
+        osqp_workspace_->data->u = nullptr;
+
         //cleanup workspace
         osqp_cleanup(osqp_workspace_);
     }
