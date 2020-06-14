@@ -167,12 +167,6 @@ add_executable(track_publisher ${track_publisher_SOURCE_FILES})
 target_link_libraries(track_publisher ${catkin_LIBRARIES})
 add_dependencies(track_publisher ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-# PID controller
-aux_source_directory(src/controller_pid controller_pid_SOURCE_FILES)
-add_executable(controller_pid ${controller_pid_SOURCE_FILES})
-target_link_libraries(controller_pid ${catkin_LIBRARIES})
-add_dependencies(controller_pid ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
 #MPC controller
 aux_source_directory(src/controller_mpc controller_mpc_SOURCE_FILES)
 add_executable(controller_mpc ${controller_mpc_SOURCE_FILES})
