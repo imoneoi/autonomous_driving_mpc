@@ -22,7 +22,7 @@ bool gResetRequestFlag = false;
 void loadParameters() {
     ros::NodeHandle nh_priv("~");
 
-    nh_priv.param<SIMULATOR_DATA_TYPE>("simulation/dt", gParam.dt_, 0.0001);
+    nh_priv.param<SIMULATOR_DATA_TYPE>("simulation/dt", gParam.dt_, 0.001);
     nh_priv.param<SIMULATOR_DATA_TYPE>("simulation/display_dt", gParam.display_dt_, 0.01);
 
     //default parameter setting from BARC https://github.com/MPC-Berkeley/barc

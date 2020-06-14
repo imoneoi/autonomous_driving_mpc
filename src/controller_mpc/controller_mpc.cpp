@@ -9,7 +9,7 @@
 #include <car_model/simulator_reset.h>
 #include <car_model/car_state.h>
 
-double gVelocity = 10.0;
+double gVelocity = 2.0;
 double gMinVelocity = 0.5;
 double gCurvatureK = 150.0;
 
@@ -93,9 +93,9 @@ int main(int argc, char **argv) {
     //setup communication
     ros::NodeHandle nh;
     ros::Publisher  cmd_vel_pub     = nh.advertise<geometry_msgs::Twist>("cmd_vel", 10);
-    ros::Publisher  trajectory_pub  = nh.advertise<geometry_msgs::PoseArray>("planned_trajectory", 1);
-    ros::Publisher  prediction_pub  = nh.advertise<geometry_msgs::PoseArray>("predicted_trajectory", 1);
-    ros::Subscriber state_sub       = nh.subscribe<car_model::car_state>("car_state", 1, stateCallback);
+    ros::Publisher  trajectory_pub  = nh.advertise<geometry_msgs::PoseArray>("planned_trajectory", 10);
+    ros::Publisher  prediction_pub  = nh.advertise<geometry_msgs::PoseArray>("predicted_trajectory", 10);
+    ros::Subscriber state_sub       = nh.subscribe<car_model::car_state>("car_state", 10, stateCallback);
 
     //load tracks
     ros::NodeHandle nh_priv("~");

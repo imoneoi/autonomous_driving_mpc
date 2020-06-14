@@ -136,7 +136,7 @@ int main(int argc, char **argv) {
     double param_density;
 
     ros::NodeHandle npriv("~");
-    npriv.param<std::string>("waypoints_file", param_waypoints_filename, "/home/one/Documents/ROS_Workspace/src/car_model/tracks/racetrack01.txt");
+    npriv.param<std::string>("waypoints_file", param_waypoints_filename, "");
     npriv.param<double>("scale", param_scale, 0.001);
     npriv.param<double>("density", param_density, 0.2);
 
