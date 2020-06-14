@@ -93,7 +93,6 @@ generate_messages(
 
 ## Generate dynamic reconfigure parameters in the 'cfg' folder
 generate_dynamic_reconfigure_options(
-  cfg/controller_pid_dyn_reconf.cfg
 )
 
 ###################################
@@ -173,10 +172,18 @@ add_executable(controller_mpc ${controller_mpc_SOURCE_FILES})
 target_link_libraries(controller_mpc ${catkin_LIBRARIES})
 add_dependencies(controller_mpc ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
+#Unit Test
+add_executable(test src/test/test.cpp src/controller_mpc/mpc.cpp src/controller_mpc/path_planner.cpp)
+target_link_libraries(test ${catkin_LIBRARIES})
+add_dependencies(test ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
 #OSQP for MPC controller
 target_include_directories(controller_mpc PUBLIC osqp/include)
 find_library(OSQP_LIBRARY libosqp.a HINTS osqp/build/out)
 target_link_libraries(controller_mpc ${OSQP_LIBRARY} dl)
+
+target_include_directories(test PUBLIC osqp/include)
+target_link_libraries(test ${OSQP_LIBRARY} dl)
 
 #############
 ## Install ##

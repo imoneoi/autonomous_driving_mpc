@@ -14,4 +14,10 @@
     <!-- start Rviz -->
     <node name="rviz" pkg="rviz" type="rviz" args="-d $(find car_model)/rviz/sim.rviz">
     </node>
+
+    <!-- start controller -->
+    <node name="controller_mpc" pkg="car_model" type="controller_mpc">
+        <param name="track_filename" value="$(find car_model)/tracks/racetrack01.txt" />
+        <param name="track_scale" value="0.0025" />
+    </node>
 </launch>
